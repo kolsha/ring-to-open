@@ -6,7 +6,7 @@ services:
     container_name: ring-to-open
     restart: unless-stopped
     env_file:
-      - .env
+      - /app/.env
     # Alternative: You can pass environment variables directly instead of using .env file
     # environment:
     #   - RING_REFRESH_TOKEN=${RING_REFRESH_TOKEN}
