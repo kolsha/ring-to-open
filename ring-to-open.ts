@@ -244,7 +244,9 @@ async function main() {
   if (!config.refreshToken) {
     console.error("❌ RING_REFRESH_TOKEN is required in .env file");
     console.log("💡 Run 'npm run auth' to get your refresh token");
-    process.exit(1);
+    // Wait 5 minutes without consuming CPU
+    await new Promise(resolve => setTimeout(resolve, 5 * 60 * 1000));
+    return;
   }
 
   const ringToOpen = new RingToOpen(config);
