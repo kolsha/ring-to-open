@@ -16,6 +16,6 @@ services:
     #   - DEBUG=${DEBUG:-false}
     volumes:
       # Mount .env file to persist refresh token updates
-      - ./.env:/app/.env
+      - ./:/app/
     # No ports needed - this app doesn't expose any HTTP endpoints
 

@@ -25,6 +25,7 @@ RUN npx tsc
 # Expose any ports if needed (currently not required for this app)
 # EXPOSE 3000
 
-# Default command - expects .env file to be mounted or environment variables to be passed
-CMD ["node", "--env-file=.env", "lib/ring-to-open.js"]
+# Default command - environment variables are passed directly by the container runtime
+# The application uses dotenv.config() which will use environment variables if .env file doesn't exist
+CMD ["node", "lib/ring-to-open.js"]
 
