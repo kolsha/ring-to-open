@@ -14,8 +14,9 @@ services:
     #   - DOOR_CLOSE_TIME=${DOOR_CLOSE_TIME:-22:00}
     #   - AUTO_OPEN_ENABLED=${AUTO_OPEN_ENABLED:-true}
     #   - DEBUG=${DEBUG:-false}
-    volumes:
-      # Mount .env file to persist refresh token updates
-      - ./:/app/
+volumes:
+      - type: bind
+        source: ./.env
+        target: /app/.env
     # No ports needed - this app doesn't expose any HTTP endpoints
 
