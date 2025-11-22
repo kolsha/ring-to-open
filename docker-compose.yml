@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  ring-to-open:
+    build: .
+    container_name: ring-to-open
+    restart: unless-stopped
+    env_file:
+      - .env
+    # Alternative: You can pass environment variables directly instead of using .env file
+    # environment:
+    #   - RING_REFRESH_TOKEN=${RING_REFRESH_TOKEN}
+    #   - DOOR_OPEN_TIME=${DOOR_OPEN_TIME:-08:00}
+    #   - DOOR_CLOSE_TIME=${DOOR_CLOSE_TIME:-22:00}
+    #   - AUTO_OPEN_ENABLED=${AUTO_OPEN_ENABLED:-true}
+    #   - DEBUG=${DEBUG:-false}
+    volumes:
+      # Mount .env file to persist refresh token updates
+      - ./.env:/app/.env
+    # No ports needed - this app doesn't expose any HTTP endpoints
+

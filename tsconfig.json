@@ -5,6 +5,11 @@
     "outDir": "./lib",
     "strict": true,
     "esModuleInterop": true,
-    "skipLibCheck": true
-  }
+    "skipLibCheck": true,
+    "types": ["node"],
+    "moduleResolution": "node",
+    "resolveJsonModule": true
+  },
+  "include": ["*.ts"],
+  "exclude": ["node_modules", "lib"]
 }
