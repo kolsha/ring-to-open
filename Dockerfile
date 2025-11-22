@@ -19,13 +19,8 @@ COPY *.ts ./
 # Compile TypeScript to JavaScript
 RUN npx tsc
 
-# Create a non-root user for security
-RUN useradd -m -u 1000 appuser
-
-# Change ownership of all files to appuser before switching users
-RUN chown -R appuser:appuser /app
-
-USER appuser
+# Note: Running as root user for simplicity
+# The container is isolated in the deployment environment
 
 # Expose any ports if needed (currently not required for this app)
 # EXPOSE 3000
