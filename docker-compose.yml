@@ -14,7 +14,7 @@ services:
     #   - DOOR_CLOSE_TIME=${DOOR_CLOSE_TIME:-22:00}
     #   - AUTO_OPEN_ENABLED=${AUTO_OPEN_ENABLED:-true}
     #   - DEBUG=${DEBUG:-false}
-volumes:
+    volumes:
       - type: bind
         source: ./.env
         target: /app/.env
