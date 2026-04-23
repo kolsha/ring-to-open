@@ -11,10 +11,6 @@ services:
       - DOOR_CLOSE_TIME=${DOOR_CLOSE_TIME:-22:00}
       - AUTO_OPEN_ENABLED=${AUTO_OPEN_ENABLED:-true}
       - DEBUG=${DEBUG:-false}
-    volumes:
-      # Persistent volume for refresh token — survives redeployments
-      - ring-data:/data
     # No ports needed - this app doesn't expose any HTTP endpoints
-
-volumes:
-  ring-data:
+    # In Coolify, /app is automatically mounted as a persistent volume,
+    # so ring_refresh_token file stored there will survive redeployments.

@@ -9,8 +9,9 @@ dotenv.config();
 const readFileAsync = promisify(readFile);
 const writeFileAsync = promisify(writeFile);
 
-// Path to the persistent token file inside the Docker volume
-const TOKEN_FILE = process.env.TOKEN_FILE || "/data/ring_refresh_token";
+// Path to the persistent token file.
+// /app is mounted as a persistent volume by Coolify, so this file survives redeployments.
+const TOKEN_FILE = process.env.TOKEN_FILE || "/app/ring_refresh_token";
 
 async function readPersistedToken(): Promise<string | null> {
   try {
