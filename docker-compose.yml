@@ -13,9 +13,15 @@ services:
       - DEBUG=${DEBUG:-false}
       - HTTP_PORT=${HTTP_PORT:-3000}
       - API_SECRET=${API_SECRET}
-    # Expose the unlock HTTP endpoint so other containers in Coolify can reach it.
-    # Other services can call http://ring-to-open:3000/unlock inside the same Docker network.
     ports:
       - "${HTTP_PORT:-3000}:${HTTP_PORT:-3000}"
+    # Join the shared Coolify network so other Coolify-managed containers
+    # can reach this service at http://ring-to-open:3000
+    networks:
+      - coolify
     # In Coolify, /app is automatically mounted as a persistent volume,
     # so ring_refresh_token file stored there will survive redeployments.
+
+networks:
+  coolify:
+    external: true
