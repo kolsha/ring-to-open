@@ -1,10 +1,29 @@
-import { PushNotificationAction, RingApi, RingIntercom } from "ring-client-api";
+import { RingApi, RingIntercom } from "ring-client-api";
 import { readFile, writeFile } from "fs";
 import { promisify } from "util";
 import * as dotenv from "dotenv";
 
 // Load environment variables
 dotenv.config();
+
+const readFileAsync = promisify(readFile);
+const writeFileAsync = promisify(writeFile);
+
+// Path to the persistent token file inside the Docker volume
+const TOKEN_FILE = process.env.TOKEN_FILE || "/data/ring_refresh_token";
+
+async function readPersistedToken(): Promise<string | null> {
+  try {
+    const token = await readFileAsync(TOKEN_FILE, "utf-8");
+    return token.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+async function persistToken(token: string): Promise<void> {
+  await writeFileAsync(TOKEN_FILE, token, "utf-8");
+}
 
 interface DoorConfig {
   openTime: string; // Format: "HH:MM" (e.g., "08:00")
@@ -82,27 +101,17 @@ class RingToOpen {
   }
 
   private onRefreshTokenUpdated() {
-    // Set up refresh token handling
     this.ringApi.onRefreshTokenUpdated.subscribe(
-        async ({ newRefreshToken, oldRefreshToken }: { newRefreshToken: string; oldRefreshToken?: string }) => {
-          console.log("🔄 Refresh Token Updated");
-          
-          if (!oldRefreshToken) {
-            return;
-          }
-
-          try {
-            const currentConfig = await promisify(readFile)(".env");
-            const updatedConfig = currentConfig
-              .toString()
-              .replace(oldRefreshToken, newRefreshToken);
-            await promisify(writeFile)(".env", updatedConfig);
-            console.log("✅ Updated .env file with new refresh token");
-          } catch (error) {
-            console.error("❌ Failed to update .env file:", error);
-          }
+      async ({ newRefreshToken }: { newRefreshToken: string; oldRefreshToken?: string }) => {
+        console.log("🔄 Refresh Token Updated");
+        try {
+          await persistToken(newRefreshToken);
+          console.log(`✅ Persisted new refresh token to ${TOKEN_FILE}`);
+        } catch (error) {
+          console.error("❌ Failed to persist refresh token:", error);
         }
-      );
+      }
+    );
   }
 
   /**
@@ -228,9 +237,16 @@ class RingToOpen {
 
 // Main execution
 async function main() {
-  // Configuration - you can modify these values
+  // Prefer the persisted token (updated by Ring API) over the env var (set by Coolify on deploy)
+  const persistedToken = await readPersistedToken();
+  if (persistedToken) {
+    console.log(`🔑 Using persisted refresh token from ${TOKEN_FILE}`);
+  } else {
+    console.log("🔑 No persisted token found, using RING_REFRESH_TOKEN env var");
+  }
+
   const config: RingToOpenConfig = {
-    refreshToken: process.env.RING_REFRESH_TOKEN!,
+    refreshToken: persistedToken ?? process.env.RING_REFRESH_TOKEN!,
     doorConfig: {
       openTime: process.env.DOOR_OPEN_TIME || "08:00",
       closeTime: process.env.DOOR_CLOSE_TIME || "22:00", 
