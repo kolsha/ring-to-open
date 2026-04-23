@@ -1,6 +1,7 @@
 import { RingApi, RingIntercom } from "ring-client-api";
 import { readFile, writeFile } from "fs";
 import { promisify } from "util";
+import * as http from "http";
 import * as dotenv from "dotenv";
 
 // Load environment variables
@@ -37,12 +38,16 @@ interface RingToOpenConfig {
   refreshToken: string;
   doorConfig: DoorConfig;
   debug?: boolean;
+  httpPort?: number;
+  apiSecret?: string;
 }
 
 class RingToOpen {
   private ringApi: RingApi;
   private config: RingToOpenConfig;
   private isRunning: boolean = false;
+  private intercoms: RingIntercom[] = [];
+  private httpServer: http.Server | null = null;
 
   constructor(config: RingToOpenConfig) {
     this.config = config;
@@ -135,6 +140,7 @@ class RingToOpen {
       // Set up doorbell press listeners for all devices
       for (const location of locations) {
         const intercoms = await location.intercoms;
+        this.intercoms.push(...intercoms);
         console.log(`\n📍 Location: ${location.name} (${location.id})`);
         console.log(`📱 Found ${intercoms.length} intercom(s):`);
         
@@ -167,6 +173,7 @@ class RingToOpen {
       }
 
       this.isRunning = true;
+      this.startHttpServer();
       console.log("✅ Ring to Open service is now running!");
       console.log(`⏰ Auto-open hours: ${this.config.doorConfig.openTime} - ${this.config.doorConfig.closeTime}`);
       console.log(`🔓 Auto-open enabled: ${this.config.doorConfig.autoOpenEnabled}`);
@@ -177,6 +184,90 @@ class RingToOpen {
       console.error("❌ Failed to start Ring to Open service:", error);
       throw error;
     }
+  }
+
+  /**
+   * Unlock all (or a specific) intercom door
+   */
+  public async unlockDoor(intercomName?: string): Promise<{ success: boolean; unlocked: string[]; errors: string[] }> {
+    const unlocked: string[] = [];
+    const errors: string[] = [];
+
+    const targets = intercomName
+      ? this.intercoms.filter((ic) => ic.name === intercomName)
+      : this.intercoms;
+
+    if (targets.length === 0) {
+      return { success: false, unlocked, errors: ["No matching intercom found"] };
+    }
+
+    for (const intercom of targets) {
+      try {
+        await intercom.unlock();
+        console.log(`🔓 Unlocked door via HTTP request: ${intercom.name}`);
+        unlocked.push(intercom.name);
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error(`❌ Failed to unlock ${intercom.name}: ${msg}`);
+        errors.push(`${intercom.name}: ${msg}`);
+      }
+    }
+
+    return { success: unlocked.length > 0, unlocked, errors };
+  }
+
+  /**
+   * Start the HTTP server exposing the /unlock endpoint
+   */
+  private startHttpServer(): void {
+    const port = this.config.httpPort ?? 3000;
+    const secret = this.config.apiSecret;
+
+    this.httpServer = http.createServer(async (req, res) => {
+      const url = new URL(req.url ?? "/", `http://localhost`);
+
+      if (req.method === "POST" && url.pathname === "/unlock") {
+        if (secret) {
+          const authHeader = req.headers["x-api-key"];
+          if (authHeader !== secret) {
+            res.writeHead(401, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "Unauthorized" }));
+            return;
+          }
+        }
+
+        let body = "";
+        req.on("data", (chunk) => { body += chunk; });
+        req.on("end", async () => {
+          let intercomName: string | undefined;
+          try {
+            if (body) intercomName = JSON.parse(body)?.intercom;
+          } catch {
+            // ignore malformed body — unlock all
+          }
+
+          const result = await this.unlockDoor(intercomName);
+          res.writeHead(result.success ? 200 : 500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify(result));
+        });
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === "/health") {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ status: "ok", running: this.isRunning, intercoms: this.intercoms.map((ic) => ic.name) }));
+        return;
+      }
+
+      res.writeHead(404, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Not found" }));
+    });
+
+    this.httpServer.listen(port, () => {
+      console.log(`🌐 HTTP server listening on port ${port}`);
+      console.log(`   POST /unlock  — unlock door (requires X-Api-Key header if API_SECRET is set)`);
+      console.log(`   GET  /health  — service health check`);
+    });
   }
 
   /**
@@ -215,6 +306,11 @@ class RingToOpen {
   public async stop(): Promise<void> {
     this.isRunning = false;
     console.log("🛑 Ring to Open service stopped");
+
+    if (this.httpServer) {
+      this.httpServer.close(() => console.log("🌐 HTTP server closed"));
+      this.httpServer = null;
+    }
     
     // Unsubscribe from ding events for all intercoms
     try {
@@ -250,11 +346,13 @@ async function main() {
     refreshToken: persistedToken ?? process.env.RING_REFRESH_TOKEN!,
     doorConfig: {
       openTime: process.env.DOOR_OPEN_TIME || "08:00",
-      closeTime: process.env.DOOR_CLOSE_TIME || "22:00", 
+      closeTime: process.env.DOOR_CLOSE_TIME || "22:00",
       autoOpenEnabled: process.env.AUTO_OPEN_ENABLED === "true",
       doorDeviceId: process.env.DOOR_DEVICE_ID,
     },
     debug: process.env.DEBUG === "true",
+    httpPort: process.env.HTTP_PORT ? parseInt(process.env.HTTP_PORT, 10) : 3000,
+    apiSecret: process.env.API_SECRET,
   };
 
   // Validate configuration

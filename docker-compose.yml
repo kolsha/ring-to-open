@@ -11,6 +11,11 @@ services:
       - DOOR_CLOSE_TIME=${DOOR_CLOSE_TIME:-22:00}
       - AUTO_OPEN_ENABLED=${AUTO_OPEN_ENABLED:-true}
       - DEBUG=${DEBUG:-false}
-    # No ports needed - this app doesn't expose any HTTP endpoints
+      - HTTP_PORT=${HTTP_PORT:-3000}
+      - API_SECRET=${API_SECRET}
+    # Expose the unlock HTTP endpoint so other containers in Coolify can reach it.
+    # Other services can call http://ring-to-open:3000/unlock inside the same Docker network.
+    ports:
+      - "${HTTP_PORT:-3000}:${HTTP_PORT:-3000}"
     # In Coolify, /app is automatically mounted as a persistent volume,
     # so ring_refresh_token file stored there will survive redeployments.
